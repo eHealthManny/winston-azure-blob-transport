@@ -1,6 +1,6 @@
 {
   "name": "ehealth-winston-azure-blob-transport",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Winston Azure blob transport",
   "main": "index.js",
   "scripts": {
