@@ -39,7 +39,7 @@ class BlobTransport extends Transport
         if (err?)
           # Not much we can do here; swallow the error. Usually the next check will pass.
         else if result && result.entries[0] && result.entries[0].contentLength >= instance.maxBlobSize
-           rollBlob();
+           instance.rollBlob();
        )
     ,HOUR_IN_MILLISECONDS
 
