@@ -20,6 +20,7 @@ HOUR_IN_MILLISECONDS = 60000 * 60;
 class BlobTransport extends Transport
 
   constructor: ({@account, @containerName, @blobName, @maxBlobSize, @maxBlockCount = 48000 , @level = "info"}) ->
+    super();
     @maxBlobSize = if @maxBlobSize then (@maxBlobSize * MB) else undefined
     @origBlobName = @blobName
     @blobName = if @maxBlobSize then (@blobName + '-' + @_timestamp()) else @origBlobName
