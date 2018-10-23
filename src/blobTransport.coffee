@@ -193,14 +193,11 @@ class BlobTransport extends Transport
 
       __whenLogAllBlock = ->
         debug "Finish append all lines to blob"
-        #_.each tasks, ({callback}) -> callback null, true
         __whenFinishCargo()
 
       debug "Log #{tasks.length} lines"
       logBlock = _.map(tasks, "line").join ""
       taskObjects = chunkTasksBySize tasks
-      chunks = chunk logBlock, MAX_BLOCK_SIZE
-      debug "Saving #{chunks.length} chunk(s)"
 
       # refresh the current blob
       blobStatusProm = instance.getCurBlob()    
