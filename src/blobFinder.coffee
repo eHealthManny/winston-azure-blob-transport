@@ -33,7 +33,6 @@ getLatestBlob = (service, containerName, searchString, searchOptions) ->
                     results.entries = results.entries.concat(nextBlobResults.entries)
                     results.continuationToken = nextBlobResults.continuationToken
                     results
-                    #results.sortBlobs();
                 )
             catch err
                 console.log 'There was an error loading the next batch of blobs for container ' + containers.entries[x].name + ' blob prefix was ' + blobPrefix, err
@@ -69,7 +68,6 @@ generateBlobSearchString = (appPrefix, date, useMonth, useDay) ->
 ###*
 #	Finds the most recent blob logs for a given blob prefix. This function assumes that the blobs are named with an iso 8601 timestamp
         ex: 2018-07-28T14:31:52+00:00
-# @param {any} storageAccountOrConnectionString A storage account connection string or an instace of storage account.
 # @param {*} containerPrefix The exact container name to match on.
 # @param {*} blobPrefix - A blob prefix to restrict search to.
 # @param {*} limit - The number of blobs to return from the search.
