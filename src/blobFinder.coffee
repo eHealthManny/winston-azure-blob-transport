@@ -3,9 +3,11 @@ moment = require('moment')
 
 ###*
 # Fetches the latest blob in the container with the specefied prefix
+# continuationToken - is a special parameter returned by the blob storage sdk. If passed in, then a previous search will be continued.
+#                   ensure that you pass the same parameters as the original search when using the continuation token
 ###
 
-getLatestBlob = (service, containerName, searchString, searchOptions) ->
+getLatestBlob = (service, containerName, searchString, searchOptions, continuationToken) ->
     # promisify certain functions
     service.listContainersSegmentedWithPrefix = Promise.promisify(service.listContainersSegmentedWithPrefix)
     service.listBlobsSegmentedWithPrefix = Promise.promisify(service.listBlobsSegmentedWithPrefix)
@@ -24,21 +26,7 @@ getLatestBlob = (service, containerName, searchString, searchOptions) ->
     if !searchString
         searchString = ''
     # use the microsoft provided service to list all blobs in the current container with our prefix.
-    service.listBlobsSegmentedWithPrefix(containerName, searchString, undefined, azureSearchOptions).then (results) ->
-        # create an async function to load the next batch of blobs if available.
-
-        results.nextPage = ->
-            try
-                return service.listBlobsSegmentedWithPrefix(containerName, blobPrefix, results.continuationToken).then((results) ->
-                    results.entries = results.entries.concat(nextBlobResults.entries)
-                    results.continuationToken = nextBlobResults.continuationToken
-                    results
-                )
-            catch err
-                console.log 'There was an error loading the next batch of blobs for container ' + containers.entries[x].name + ' blob prefix was ' + blobPrefix, err
-            return
-
-        results
+    return service.listBlobsSegmentedWithPrefix(containerName, searchString, continuationToken, azureSearchOptions)
 
 ###*
 # Generates a string used to search for blobs. Our blob names look like this 
@@ -78,46 +66,59 @@ searchLatestBlob = (service, containerPrefix, blobPrefix, limit) ->
     result = undefined
     # start with today
     curDateSearch = moment().add(3, 'month')
+    
     # do we need to drill down to the day level?
     day = false
+    
     # do we need to drill down to the month level?
     month = false
-    # make our search and limit results to 100;
 
-    recursiveSearch = ->
+    # do we need to start paging through results?
+    useContinuation = false;
+
+    # make our search (limit results to 100)
+    recursiveSearch = (continuationToken)->
         # This is the substring of the date portion we will use to search for blobs ex: 2018 or 2018-05 OR 2018-05-21. 
         nextSearch = generateBlobSearchString(blobPrefix, curDateSearch, month, day)
-        getLatestBlob(service, containerPrefix, nextSearch, {maxResults: 100, exactContainerName: true}).then (nextResult) ->
+        getLatestBlob(service, containerPrefix, nextSearch, {maxResults: 100, exactContainerName: true}, continuationToken).then (nextResult) ->
             # Sort the blobs in descending order.
             nextResult.entries.sort (a, b) ->
                 if b.name < a.name
                     return -1
                 if b.name > a.name
-                    return 1 
-            if nextResult and nextResult.entries.length > 0
-                # if continuation token = true, there are more results. On next search restrict our timeframe
-                if nextResult.continuationToken?
-                    if !month? 
-                        month = true 
-                    else 
-                        day = true
-                else
+                    return 1
+            # the next enclosing if will set this to something if we find a result (or give up)
+            result = undefined;
+            
+            # results were found with the last search. Decide if we need to drill down on the next search or if we found the latest blob.
+            if nextResult? and nextResult.entries.length > 0
+                if  !nextResult.continuationToken?
+                    # if there are results and no continuation token we found the latest blob.
                     result = nextResult.entries[0]
+                else
+                    # if there are results and continuation token = true, there are more results. On next search restrict our timeframe
+                    if !month 
+                        month = true 
+                    else if !day 
+                        day = true
+                    else 
+                        useContinuation = true
+            # no results were found so start moving back in time to search
             else
-                # We found no results so move back in time to search for more blobs
-                if day
+                if day is true
                     curDateSearch.subtract 1, 'day'
-                else if month
+                else if month is true
                     curDateSearch = curDateSearch.subtract(1, 'month').endOf('month')
                 else
                     curDateSearch.subtract(1, 'year').endOf 'year'
-            if result
+
+            if result? or (moment().year() - curDateSearch.year() >= 20)
+                # result was found OR we searched longer than 20 years
                 return result
-            if moment().year() - curDateSearch.year() >= 20
-                # We have searched farther than 20 years just quit;
-                undefined
-            else
-                recursiveSearch()
+            else 
+                # if we need to start drilling down into paged results send the continuation token (if any)
+                nextContuationToken = if useContinuation? then nextResult.continuationToken else undefined
+                return recursiveSearch(nextContuationToken);
 
     return recursiveSearch()
 
